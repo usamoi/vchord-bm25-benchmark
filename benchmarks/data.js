@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1769154559570,
+  "lastUpdate": 1769154607886,
   "repoUrl": "https://github.com/cutecutecat/vchord-bm25-benchmark",
   "entries": {
     "Benchmarks": [
@@ -560,6 +560,38 @@ window.BENCHMARK_DATA = {
           {
             "name": "unknown (99.9K docs) - Index Size",
             "value": 15.52,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "cutecutecat",
+            "username": "cutecutecat",
+            "email": "junyuchen@tensorchord.ai"
+          },
+          "committer": {
+            "name": "cutecutecat",
+            "username": "cutecutecat",
+            "email": "junyuchen@tensorchord.ai"
+          },
+          "id": "4330fd98fc1fcca6ffb5f6ec8ed2ba5ec921c95c",
+          "message": "first commit",
+          "timestamp": "2026-01-23T02:02:42Z",
+          "url": "https://github.com/cutecutecat/vchord-bm25-benchmark/commit/4330fd98fc1fcca6ffb5f6ec8ed2ba5ec921c95c"
+        },
+        "date": 1769154607036,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "unknown (100.0K docs) - Index Build Time",
+            "value": 1119.026,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (100.0K docs) - Index Size",
+            "value": 328.48,
             "unit": "MB"
           }
         ]
