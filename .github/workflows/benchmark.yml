@@ -591,6 +591,7 @@ jobs:
         shared_preload_libraries = 'pg_tokenizer'
         search_path = 'public, pg_catalog, bm25_catalog, tokenizer_catalog'
         bm25_catalog.bm25_limit = 10
+        bm25_catalog.enable_prefilter = off
         EOF
 
         # Enable compression if requested
