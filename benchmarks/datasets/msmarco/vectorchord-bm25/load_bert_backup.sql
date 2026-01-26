@@ -95,29 +95,8 @@ LIMIT 5;
 \echo ''
 \echo '=== Building BM25 Index ==='
 \echo 'Creating BM25 index on ~8.8M passages (this will take a while)...'
-SELECT tokenizer_catalog.create_text_analyzer('text_analyzer1', $$
-pre_tokenizer = "unicode_segmentation"
-[[character_filters]]
-to_lowercase = {}
-[[character_filters]]
-unicode_normalization = "nfkd"
-[[token_filters]]
-skip_non_alphanumeric = {}
-[[token_filters]]
-stopwords = "nltk_english"
-[[token_filters]]
-stemmer = "english_porter2"
-$$);
-
-SELECT tokenizer_catalog.create_custom_model('model1', $$
-table = 'msmarco_passages'
-column = 'passage_text'
-text_analyzer = 'text_analyzer1'
-$$);
-
 SELECT create_tokenizer('bert', $$
-text_analyzer = 'text_analyzer1'
-model = 'model1'
+    model = "bert_base_uncased"
 $$);
 UPDATE msmarco_passages SET embedding = tokenize(passage_text, 'bert');
 CREATE INDEX msmarco_bm25_idx ON msmarco_passages
