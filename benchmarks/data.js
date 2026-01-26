@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1769418344242,
+  "lastUpdate": 1769418684227,
   "repoUrl": "https://github.com/cutecutecat/vchord-bm25-benchmark",
   "entries": {
     "Benchmarks": [
@@ -2082,6 +2082,83 @@ window.BENCHMARK_DATA = {
           {
             "name": "unknown (1.0M docs) - Index Size",
             "value": 683.7,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "cutecutecat",
+            "username": "cutecutecat",
+            "email": "junyuchen@tensorchord.ai"
+          },
+          "committer": {
+            "name": "cutecutecat",
+            "username": "cutecutecat",
+            "email": "junyuchen@tensorchord.ai"
+          },
+          "id": "2610f309f632b28ca8a774133e07ec2b068f92ca",
+          "message": "test disable prefiler\n\nSigned-off-by: cutecutecat <junyuchen@tensorchord.ai>",
+          "timestamp": "2026-01-26T07:12:25Z",
+          "url": "https://github.com/cutecutecat/vchord-bm25-benchmark/commit/2610f309f632b28ca8a774133e07ec2b068f92ca"
+        },
+        "date": 1769418683914,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "unknown (100.0K docs) - Index Build Time",
+            "value": 1159.147,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (100.0K docs) - 1 Token Query (p50)",
+            "value": 1.1,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (100.0K docs) - 2 Token Query (p50)",
+            "value": 0.91,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (100.0K docs) - 3 Token Query (p50)",
+            "value": 1.14,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (100.0K docs) - 4 Token Query (p50)",
+            "value": 1.09,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (100.0K docs) - 5 Token Query (p50)",
+            "value": 1.3,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (100.0K docs) - 6 Token Query (p50)",
+            "value": 1.97,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (100.0K docs) - 7 Token Query (p50)",
+            "value": 2.01,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (100.0K docs) - 8+ Token Query (p50)",
+            "value": 3.06,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (100.0K docs) - Throughput (800 queries, avg ms/query)",
+            "value": 1.71,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (100.0K docs) - Index Size",
+            "value": 328.48,
             "unit": "MB"
           }
         ]
