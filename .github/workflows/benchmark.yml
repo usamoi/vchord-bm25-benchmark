@@ -181,6 +181,7 @@ jobs:
         pg_ctl stop -D tmp_bench/data || true
         rm -rf tmp_bench
 
+
   # System Y benchmark (competitive baseline)
   # NOTE: pg_textsearch
   # instance due to conflicting 'bm25' access method names. This job runs
