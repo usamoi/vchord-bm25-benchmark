@@ -1,0 +1,157 @@
+name: Ubuntu Latest Hardware Probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  hardware-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Collect system info
+        run: |
+          set -euo pipefail
+          mkdir -p report
+
+          echo "UTC Time: $(date -u)" > report/summary.txt
+          echo "" >> report/summary.txt
+
+          echo "== /etc/os-release ==" >> report/summary.txt
+          cat /etc/os-release >> report/summary.txt
+          echo "" >> report/summary.txt
+
+          echo "== uname -a ==" >> report/summary.txt
+          uname -a >> report/summary.txt
+          echo "" >> report/summary.txt
+
+          if command -v lsb_release >/dev/null 2>&1; then
+            echo "== lsb_release -a ==" >> report/summary.txt
+            lsb_release -a >> report/summary.txt
+            echo "" >> report/summary.txt
+          fi
+
+          echo "== CPU Summary ==" >> report/summary.txt
+          echo "nproc (all): $(nproc --all)" >> report/summary.txt
+          echo "" >> report/summary.txt
+
+          echo "== lscpu ==" > report/lscpu.txt
+          lscpu >> report/lscpu.txt
+
+          echo "== CPU Model Names ==" > report/cpu-models.txt
+          awk -F: '/model name/ {print $2}' /proc/cpuinfo | sed 's/^ *//' | sort | uniq -c >> report/cpu-models.txt
+
+          echo "== Memory (free -h) ==" > report/memory.txt
+          free -h >> report/memory.txt
+          echo "" >> report/memory.txt
+          echo "== /proc/meminfo ==" >> report/memory.txt
+          cat /proc/meminfo >> report/memory.txt
+
+          echo "== Disk (lsblk) ==" > report/disk.txt
+          lsblk -e7 -o NAME,SIZE,TYPE,MOUNTPOINT,FSTYPE,MODEL,ROTA,TRAN,RO >> report/disk.txt
+          echo "" >> report/disk.txt
+          echo "== Disk (df -hT) ==" >> report/disk.txt
+          df -hT >> report/disk.txt
+
+      - name: Install fio
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fio
+
+      - name: Disk performance (fio)
+        run: |
+          set -euo pipefail
+          mkdir -p report
+
+          TESTDIR=/tmp/fio-test
+          mkdir -p "$TESTDIR"
+          FILE="$TESTDIR/testfile"
+
+          fio --name=seqwrite \
+            --filename="$FILE" \
+            --size=2G \
+            --bs=1M \
+            --rw=write \
+            --direct=1 \
+            --ioengine=libaio \
+            --iodepth=16 \
+            --numjobs=1 \
+            --time_based=1 \
+            --runtime=20 \
+            --group_reporting \
+            --output=report/fio-seqwrite.txt
+
+          fio --name=seqread \
+            --filename="$FILE" \
+            --size=2G \
+            --bs=1M \
+            --rw=read \
+            --direct=1 \
+            --ioengine=libaio \
+            --iodepth=16 \
+            --numjobs=1 \
+            --time_based=1 \
+            --runtime=20 \
+            --group_reporting \
+            --output=report/fio-seqread.txt
+
+          fio --name=randwrite \
+            --filename="$FILE" \
+            --size=1G \
+            --bs=4k \
+            --rw=randwrite \
+            --direct=1 \
+            --ioengine=libaio \
+            --iodepth=32 \
+            --numjobs=4 \
+            --time_based=1 \
+            --runtime=20 \
+            --group_reporting \
+            --output=report/fio-randwrite.txt
+
+          fio --name=randread \
+            --filename="$FILE" \
+            --size=1G \
+            --bs=4k \
+            --rw=randread \
+            --direct=1 \
+            --ioengine=libaio \
+            --iodepth=32 \
+            --numjobs=4 \
+            --time_based=1 \
+            --runtime=20 \
+            --group_reporting \
+            --output=report/fio-randread.txt
+
+          rm -f "$FILE"
+
+      - name: Summarize results
+        if: always()
+        run: |
+          {
+            echo "## Ubuntu Latest Hardware Probe"
+            echo ""
+            echo "### CPU"
+            echo "\`nproc --all\`: $(nproc --all)"
+            echo ""
+            echo "### Memory"
+            free -h
+            echo ""
+            echo "### Disk"
+            lsblk -e7 -o NAME,SIZE,TYPE,MOUNTPOINT,FSTYPE,MODEL,ROTA,TRAN,RO
+            echo ""
+            echo "### fio (excerpt)"
+            for f in report/fio-*.txt; do
+              echo ""
+              echo "#### $(basename "$f")"
+              grep -E 'IOPS=|BW=' "$f" | head -n 4
+            done
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-latest-hardware-probe-${{ github.run_id }}
+          path: report
+          retention-days: 30
