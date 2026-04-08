@@ -31,7 +31,7 @@ DECLARE
 BEGIN
     FOR q IN SELECT query_text FROM benchmark_queries ORDER BY random() LIMIT 50 LOOP
         EXECUTE 'SELECT passage_id FROM msmarco_passages
-                 ORDER BY embedding <&> to_bm25query(''msmarco_bm25_idx'', tokenize($1, ''bert''))
+                 ORDER BY embedding <&> to_bm25query(''msmarco_bm25_idx'', tokenize($1, ''bert'')::bm25vector)
                  LIMIT 10' USING q.query_text;
     END LOOP;
 END;
@@ -63,7 +63,7 @@ BEGIN
     FOR q IN SELECT query_text FROM benchmark_queries WHERE token_bucket = bucket ORDER BY query_id LOOP
         start_ts := clock_timestamp();
         EXECUTE 'SELECT COUNT(*) FROM (SELECT passage_id FROM msmarco_passages
-                 ORDER BY embedding <&> to_bm25query(''msmarco_bm25_idx'', tokenize($1, ''bert''))
+                 ORDER BY embedding <&> to_bm25query(''msmarco_bm25_idx'', tokenize($1, ''bert'')::bm25vector)
                  LIMIT 10) t' INTO result_count USING q.query_text;
         end_ts := clock_timestamp();
         times := array_append(times, EXTRACT(EPOCH FROM (end_ts - start_ts)) * 1000);
@@ -149,7 +149,7 @@ BEGIN
     -- Warmup: run all queries once
     FOR q IN SELECT query_text FROM benchmark_queries ORDER BY query_id LOOP
         EXECUTE 'SELECT passage_id FROM msmarco_passages
-                 ORDER BY embedding <&> to_bm25query(''msmarco_bm25_idx'', tokenize($1, ''bert''))
+                 ORDER BY embedding <&> to_bm25query(''msmarco_bm25_idx'', tokenize($1, ''bert'')::bm25vector)
                  LIMIT 10' USING q.query_text;
     END LOOP;
 
@@ -159,7 +159,7 @@ BEGIN
         start_ts := clock_timestamp();
         FOR q IN SELECT query_text FROM benchmark_queries ORDER BY query_id LOOP
             EXECUTE 'SELECT passage_id FROM msmarco_passages
-                     ORDER BY embedding <&> to_bm25query(''msmarco_bm25_idx'', tokenize($1, ''bert''))
+                     ORDER BY embedding <&> to_bm25query(''msmarco_bm25_idx'', tokenize($1, ''bert'')::bm25vector)
                      LIMIT 10' USING q.query_text;
         END LOOP;
         end_ts := clock_timestamp();
