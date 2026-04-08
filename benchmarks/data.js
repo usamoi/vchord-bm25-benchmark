@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775636998778,
+  "lastUpdate": 1775637108517,
   "repoUrl": "https://github.com/usamoi/vchord-bm25-benchmark",
   "entries": {
     "Benchmarks": [
@@ -3455,6 +3455,83 @@ window.BENCHMARK_DATA = {
           {
             "name": "unknown (8.8M docs) - Index Size",
             "value": 22267.1,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "usamoi",
+            "username": "usamoi",
+            "email": "usamoi@outlook.com"
+          },
+          "committer": {
+            "name": "usamoi",
+            "username": "usamoi",
+            "email": "usamoi@outlook.com"
+          },
+          "id": "42f5bbb86ae05ae12ae2947aa4a05069f876383b",
+          "message": "test bb branch of VectorChord-bm25",
+          "timestamp": "2026-04-08T06:36:50Z",
+          "url": "https://github.com/usamoi/vchord-bm25-benchmark/commit/42f5bbb86ae05ae12ae2947aa4a05069f876383b"
+        },
+        "date": 1775637107640,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "unknown (8.8M docs) - Index Build Time",
+            "value": 66524.864,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (8.8M docs) - 1 Token Query (p50)",
+            "value": 3.29,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (8.8M docs) - 2 Token Query (p50)",
+            "value": 3.96,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (8.8M docs) - 3 Token Query (p50)",
+            "value": 5.74,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (8.8M docs) - 4 Token Query (p50)",
+            "value": 7.15,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (8.8M docs) - 5 Token Query (p50)",
+            "value": 11.2,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (8.8M docs) - 6 Token Query (p50)",
+            "value": 15.16,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (8.8M docs) - 7 Token Query (p50)",
+            "value": 21.96,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (8.8M docs) - 8+ Token Query (p50)",
+            "value": 34.12,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (8.8M docs) - Throughput (800 queries, avg ms/query)",
+            "value": 14.23,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (8.8M docs) - Index Size",
+            "value": 948.92,
             "unit": "MB"
           }
         ]
