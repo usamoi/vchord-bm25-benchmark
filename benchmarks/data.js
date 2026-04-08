@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775633487327,
+  "lastUpdate": 1775633504730,
   "repoUrl": "https://github.com/usamoi/vchord-bm25-benchmark",
   "entries": {
     "Benchmarks": [
@@ -2961,6 +2961,38 @@ window.BENCHMARK_DATA = {
           {
             "name": "unknown (99.9K docs) - Index Size",
             "value": 15.52,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "usamoi",
+            "username": "usamoi",
+            "email": "usamoi@outlook.com"
+          },
+          "committer": {
+            "name": "usamoi",
+            "username": "usamoi",
+            "email": "usamoi@outlook.com"
+          },
+          "id": "42f5bbb86ae05ae12ae2947aa4a05069f876383b",
+          "message": "test bb branch of VectorChord-bm25",
+          "timestamp": "2026-04-08T06:36:50Z",
+          "url": "https://github.com/usamoi/vchord-bm25-benchmark/commit/42f5bbb86ae05ae12ae2947aa4a05069f876383b"
+        },
+        "date": 1775633504397,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "unknown (8.8M docs) - Index Build Time",
+            "value": 64280.901,
+            "unit": "ms"
+          },
+          {
+            "name": "unknown (8.8M docs) - Index Size",
+            "value": 948.93,
             "unit": "MB"
           }
         ]
