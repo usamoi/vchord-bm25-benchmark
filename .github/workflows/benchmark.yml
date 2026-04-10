@@ -7,7 +7,6 @@ permissions:
 env:
   PG_SEARCH_VERSION: "0.20.6"
   PG_TEXTSEARCH_VERSION: "0.4.0"
-  VECTORCHORD_BM25_VERSION: "0.3.0"
   PG_TOKENIZER_VERSION: "0.1.1"
 
 on:
@@ -558,10 +557,13 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y postgresql-17 postgresql-server-dev-17
 
-        # Install vectorchord-bm25 from GitHub releases
-        # ubuntu-latest is Ubuntu 24.04 (Noble)
-        wget -q "https://github.com/tensorchord/VectorChord-bm25/releases/download/${VECTORCHORD_BM25_VERSION}/postgresql-17-vchord-bm25_${VECTORCHORD_BM25_VERSION}-1_amd64.deb"
-        sudo dpkg -i "postgresql-17-vchord-bm25_${VECTORCHORD_BM25_VERSION}-1_amd64.deb"
+        # Install vectorchord-bm25
+        git clone https://github.com/tensorchord/VectorChord-bm25.git
+        cd VectorChord-bm25
+        make build
+        sudo make install
+
+        # Install pg_tokenizer from GitHub releases
         wget -q "https://github.com/tensorchord/pg_tokenizer.rs/releases/download/${PG_TOKENIZER_VERSION}/postgresql-17-pg-tokenizer_${PG_TOKENIZER_VERSION}-1_amd64.deb"
         sudo dpkg -i "postgresql-17-pg-tokenizer_${PG_TOKENIZER_VERSION}-1_amd64.deb"
 
@@ -584,14 +586,12 @@ jobs:
         checkpoint_completion_target = 0.9
         wal_buffers = 64MB
         random_page_cost = 1.1
-        effective_io_concurrency = 200
         max_parallel_maintenance_workers = $NCPUS
         max_parallel_workers_per_gather = $NCPUS
         max_parallel_workers = $NCPUS
-        shared_preload_libraries = 'pg_tokenizer'
-        search_path = 'public, pg_catalog, bm25_catalog, tokenizer_catalog'
-        bm25_catalog.bm25_limit = 10
-        bm25_catalog.enable_prefilter = off
+        shared_preload_libraries = 'pg_tokenizer, vchord_bm25'
+        search_path = 'public, pg_catalog, tokenizer_catalog'
+        bm25.limit = 10
         EOF
 
         # Enable compression if requested
