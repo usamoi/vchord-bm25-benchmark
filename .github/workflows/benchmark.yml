@@ -5,10 +5,8 @@ permissions:
   deployments: write
 
 env:
-  PG_SEARCH_VERSION: "0.20.6"
-  PG_TEXTSEARCH_VERSION: "0.4.0"
-  VECTORCHORD_BM25_VERSION: "0.3.0"
-  PG_TOKENIZER_VERSION: "0.1.1"
+  PG_SEARCH_VERSION: "0.23.0"
+  PG_TEXTSEARCH_VERSION: "1.0.0"
 
 on:
   # Manual trigger
@@ -32,7 +30,7 @@ on:
       compress_segments:
         description: 'Enable segment compression (delta + bitpacking)'
         required: false
-        default: false
+        default: true
         type: boolean
 
 jobs:
@@ -57,21 +55,21 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y wget ca-certificates build-essential bc
 
-        # Install PostgreSQL 17
+        # Install PostgreSQL 18
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
         echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" | \
             sudo tee /etc/apt/sources.list.d/pgdg.list
         sudo apt-get update
-        sudo apt-get install -y postgresql-17 postgresql-server-dev-17
+        sudo apt-get install -y postgresql-18 postgresql-server-dev-18
 
         # Install pg_search extension from GitHub releases
         # ubuntu-latest is Ubuntu 24.04 (Noble)
-        wget -q "https://github.com/paradedb/paradedb/releases/download/v${PG_SEARCH_VERSION}/postgresql-17-pg-search_${PG_SEARCH_VERSION}-1PARADEDB-noble_amd64.deb"
-        sudo dpkg -i "postgresql-17-pg-search_${PG_SEARCH_VERSION}-1PARADEDB-noble_amd64.deb"
+        wget -q "https://github.com/paradedb/paradedb/releases/download/v${PG_SEARCH_VERSION}/postgresql-18-pg-search_${PG_SEARCH_VERSION}-1PARADEDB-noble_amd64.deb"
+        sudo dpkg -i "postgresql-18-pg-search_${PG_SEARCH_VERSION}-1PARADEDB-noble_amd64.deb"
 
     - name: Configure PostgreSQL
       run: |
-        export PATH="/usr/lib/postgresql/17/bin:$PATH"
+        export PATH="/usr/lib/postgresql/18/bin:$PATH"
         rm -rf tmp_bench
         mkdir -p tmp_bench/socket
         initdb -D tmp_bench/data --auth-local=trust --auth-host=trust
@@ -88,7 +86,6 @@ jobs:
         checkpoint_completion_target = 0.9
         wal_buffers = 64MB
         random_page_cost = 1.1
-        effective_io_concurrency = 200
         max_parallel_maintenance_workers = $NCPUS
         max_parallel_workers_per_gather = $NCPUS
         max_parallel_workers = $NCPUS
@@ -121,7 +118,7 @@ jobs:
 
     - name: Run MS MARCO benchmark
       run: |
-        export PATH="/usr/lib/postgresql/17/bin:$PATH"
+        export PATH="/usr/lib/postgresql/18/bin:$PATH"
         export PGDATABASE=bench_test
         export DATA_DIR="$PWD/benchmarks/datasets/msmarco/data"
 
@@ -177,7 +174,7 @@ jobs:
     - name: Cleanup
       if: always()
       run: |
-        export PATH="/usr/lib/postgresql/17/bin:$PATH"
+        export PATH="/usr/lib/postgresql/18/bin:$PATH"
         pg_ctl stop -D tmp_bench/data || true
         rm -rf tmp_bench
 
@@ -219,29 +216,29 @@ jobs:
         echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" | \
             sudo tee /etc/apt/sources.list.d/pgdg.list
         sudo apt-get update
-        sudo apt-get install -y postgresql-17 postgresql-server-dev-17
+        sudo apt-get install -y postgresql-18 postgresql-server-dev-18
 
     - name: Install PostgreSQL and pg_textsearch
       run: |
         sudo apt-get update
         sudo apt-get install -y wget ca-certificates build-essential bc
 
-        # Install PostgreSQL 17
+        # Install PostgreSQL 18
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
         echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" | \
             sudo tee /etc/apt/sources.list.d/pgdg.list
         sudo apt-get update
-        sudo apt-get install -y postgresql-17 postgresql-server-dev-17
+        sudo apt-get install -y postgresql-18 postgresql-server-dev-18
 
         # Install pg_textsearch from GitHub releases
         # ubuntu-latest is Ubuntu 24.04 (Noble)
-        wget "https://github.com/timescale/pg_textsearch/releases/download/v${PG_TEXTSEARCH_VERSION}/pg-textsearch-v${PG_TEXTSEARCH_VERSION}-pg17-amd64.zip"
-        unzip pg-textsearch-v${PG_TEXTSEARCH_VERSION}-pg17-amd64.zip
-        sudo dpkg -i "pg-textsearch-postgresql-17_${PG_TEXTSEARCH_VERSION}-1_amd64.deb"
+        wget "https://github.com/timescale/pg_textsearch/releases/download/v${PG_TEXTSEARCH_VERSION}/pg-textsearch-v${PG_TEXTSEARCH_VERSION}-pg18-amd64.zip"
+        unzip pg-textsearch-v${PG_TEXTSEARCH_VERSION}-pg18-amd64.zip
+        sudo dpkg -i "pg-textsearch-postgresql-18_${PG_TEXTSEARCH_VERSION}-1_amd64.deb"
 
     - name: Configure PostgreSQL for benchmarks
       run: |
-        export PATH="/usr/lib/postgresql/17/bin:$PATH"
+        export PATH="/usr/lib/postgresql/18/bin:$PATH"
         rm -rf tmp_bench
         mkdir -p tmp_bench/socket
         initdb -D tmp_bench/data --auth-local=trust --auth-host=trust
@@ -258,10 +255,10 @@ jobs:
         checkpoint_completion_target = 0.9
         wal_buffers = 64MB
         random_page_cost = 1.1
-        effective_io_concurrency = 200
         max_parallel_maintenance_workers = $NCPUS
         max_parallel_workers_per_gather = $NCPUS
         max_parallel_workers = $NCPUS
+        shared_preload_libraries = 'pg_textsearch'
         pg_textsearch.index_memory_limit = 512MB
         pg_textsearch.segments_per_level = 16
         EOF
@@ -299,7 +296,7 @@ jobs:
 
     - name: Run MS MARCO benchmark
       run: |
-        export PATH="/usr/lib/postgresql/17/bin:$PATH"
+        export PATH="/usr/lib/postgresql/18/bin:$PATH"
         export PGDATABASE=bench_test
         export DATA_DIR="$PWD/benchmarks/datasets/msmarco/data"
 
@@ -503,7 +500,7 @@ jobs:
     - name: Cleanup
       if: always()
       run: |
-        export PATH="/usr/lib/postgresql/17/bin:$PATH"
+        export PATH="/usr/lib/postgresql/18/bin:$PATH"
         pg_ctl stop -D tmp_bench/data || true
         rm -rf tmp_bench
 
@@ -544,30 +541,31 @@ jobs:
         echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" | \
             sudo tee /etc/apt/sources.list.d/pgdg.list
         sudo apt-get update
-        sudo apt-get install -y postgresql-17 postgresql-server-dev-17
+        sudo apt-get install -y postgresql-18 postgresql-server-dev-18
 
     - name: Install PostgreSQL and vectorchord-bm25
       run: |
         sudo apt-get update
         sudo apt-get install -y wget ca-certificates build-essential bc
 
-        # Install PostgreSQL 17
+        # Install PostgreSQL 18
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
         echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" | \
             sudo tee /etc/apt/sources.list.d/pgdg.list
         sudo apt-get update
-        sudo apt-get install -y postgresql-17 postgresql-server-dev-17
+        sudo apt-get install -y postgresql-18 postgresql-server-dev-18
 
-        # Install vectorchord-bm25 from GitHub releases
-        # ubuntu-latest is Ubuntu 24.04 (Noble)
-        wget -q "https://github.com/tensorchord/VectorChord-bm25/releases/download/${VECTORCHORD_BM25_VERSION}/postgresql-17-vchord-bm25_${VECTORCHORD_BM25_VERSION}-1_amd64.deb"
-        sudo dpkg -i "postgresql-17-vchord-bm25_${VECTORCHORD_BM25_VERSION}-1_amd64.deb"
-        wget -q "https://github.com/tensorchord/pg_tokenizer.rs/releases/download/${PG_TOKENIZER_VERSION}/postgresql-17-pg-tokenizer_${PG_TOKENIZER_VERSION}-1_amd64.deb"
-        sudo dpkg -i "postgresql-17-pg-tokenizer_${PG_TOKENIZER_VERSION}-1_amd64.deb"
+        # Install vectorchord-bm25
+        rustup update
+        git clone https://github.com/tensorchord/VectorChord-bm25.git
+        cd VectorChord-bm25
+        git checkout main
+        make build
+        sudo make install
 
     - name: Configure PostgreSQL for benchmarks
       run: |
-        export PATH="/usr/lib/postgresql/17/bin:$PATH"
+        export PATH="/usr/lib/postgresql/18/bin:$PATH"
         rm -rf tmp_bench
         mkdir -p tmp_bench/socket
         initdb -D tmp_bench/data --auth-local=trust --auth-host=trust
@@ -584,21 +582,11 @@ jobs:
         checkpoint_completion_target = 0.9
         wal_buffers = 64MB
         random_page_cost = 1.1
-        effective_io_concurrency = 200
         max_parallel_maintenance_workers = $NCPUS
         max_parallel_workers_per_gather = $NCPUS
         max_parallel_workers = $NCPUS
-        shared_preload_libraries = 'pg_tokenizer'
-        search_path = 'public, pg_catalog, bm25_catalog, tokenizer_catalog'
-        bm25_catalog.bm25_limit = 10
-        bm25_catalog.enable_prefilter = off
+        shared_preload_libraries = 'vchord_bm25'
         EOF
-
-        # Enable compression if requested
-        if [ "${{ github.event.inputs.compress_segments }}" = "true" ]; then
-          echo "pg_textsearch.compress_segments = on" >> tmp_bench/data/postgresql.conf
-          echo "Compression enabled for this benchmark run"
-        fi
 
         if ! pg_ctl start -D tmp_bench/data -l tmp_bench/postgres.log -w; then
           echo "PostgreSQL failed to start. Log:"
@@ -607,7 +595,6 @@ jobs:
         fi
         export PGHOST="$PWD/tmp_bench/socket"
         createdb bench_test
-        psql -d bench_test -c "CREATE EXTENSION pg_tokenizer CASCADE"
         psql -d bench_test -c "CREATE EXTENSION vchord_bm25 CASCADE"
         echo "PGHOST=$PWD/tmp_bench/socket" >> $GITHUB_ENV
 
@@ -628,7 +615,7 @@ jobs:
 
     - name: Run MS MARCO benchmark
       run: |
-        export PATH="/usr/lib/postgresql/17/bin:$PATH"
+        export PATH="/usr/lib/postgresql/18/bin:$PATH"
         export PGDATABASE=bench_test
         export DATA_DIR="$PWD/benchmarks/datasets/msmarco/data"
 
@@ -649,7 +636,6 @@ jobs:
         echo "**Date:** $(date -u)" >> benchmark_summary.md
         echo "**Commit:** ${{ github.sha }}" >> benchmark_summary.md
         echo "**Dataset:** ${{ steps.datasets.outputs.dataset }}" >> benchmark_summary.md
-        echo "**Compression:** ${{ github.event.inputs.compress_segments == 'true' && 'enabled' || 'disabled' }}" >> benchmark_summary.md
         echo "" >> benchmark_summary.md
 
         chmod +x benchmarks/runner/extract_metrics.sh
@@ -709,10 +695,6 @@ jobs:
         if [ -f benchmark_metrics.json ]; then
           echo "### vectorchord-bm25 Benchmark Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event.inputs.compress_segments }}" = "true" ]; then
-            echo "**Compression: enabled**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Documents | $(jq -r '.metrics.num_documents // "N/A"' benchmark_metrics.json) |" >> $GITHUB_STEP_SUMMARY
@@ -832,6 +814,6 @@ jobs:
     - name: Cleanup
       if: always()
       run: |
-        export PATH="/usr/lib/postgresql/17/bin:$PATH"
+        export PATH="/usr/lib/postgresql/18/bin:$PATH"
         pg_ctl stop -D tmp_bench/data || true
         rm -rf tmp_bench

@@ -16,7 +16,6 @@
 \echo 'Loading ~8.8M passages from MS MARCO collection'
 \echo ''
 
-
 -- Clean up existing tables
 DROP TABLE IF EXISTS msmarco_passages CASCADE;
 DROP TABLE IF EXISTS msmarco_queries CASCADE;
@@ -26,8 +25,7 @@ DROP TABLE IF EXISTS msmarco_qrels CASCADE;
 \echo 'Creating passages table...'
 CREATE TABLE msmarco_passages (
     passage_id INTEGER PRIMARY KEY,
-    passage_text TEXT NOT NULL,
-    embedding bm25vector
+    passage_text TEXT NOT NULL
 );
 
 -- Create queries table
@@ -95,33 +93,9 @@ LIMIT 5;
 \echo ''
 \echo '=== Building BM25 Index ==='
 \echo 'Creating BM25 index on ~8.8M passages (this will take a while)...'
-SELECT tokenizer_catalog.create_text_analyzer('text_analyzer1', $$
-pre_tokenizer = "unicode_segmentation"
-[[character_filters]]
-to_lowercase = {}
-[[character_filters]]
-unicode_normalization = "nfkd"
-[[token_filters]]
-skip_non_alphanumeric = {}
-[[token_filters]]
-stopwords = "nltk_english"
-[[token_filters]]
-stemmer = "english_porter2"
-$$);
 
-SELECT tokenizer_catalog.create_custom_model('model1', $$
-table = 'msmarco_passages'
-column = 'passage_text'
-text_analyzer = 'text_analyzer1'
-$$);
-
-SELECT create_tokenizer('bert', $$
-text_analyzer = 'text_analyzer1'
-model = 'model1'
-$$);
-UPDATE msmarco_passages SET embedding = tokenize(passage_text, 'bert');
 CREATE INDEX msmarco_bm25_idx ON msmarco_passages
-    USING bm25 (embedding bm25_ops);
+    USING bm25 ((to_tsvector('english', passage_text)) bm25_ops) WITH (limit = 10);
 
 -- Report index and table sizes
 \echo ''
