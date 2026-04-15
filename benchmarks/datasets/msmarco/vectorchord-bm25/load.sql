@@ -18,130 +18,29 @@
 
 -- Clean up existing functions
 
-DROP TABLE IF EXISTS update_interner CASCADE;
-DROP TABLE IF EXISTS create_interner CASCADE;
+DROP FUNCTION IF EXISTS intern CASCADE;
 
 -- Create functions
 
-CREATE FUNCTION update_interner() RETURNS trigger
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    config regconfig;
-    interner regclass;
-    column_name name;
-    old_column_value text;
-    new_column_value text;
-BEGIN
-    config := TG_ARGV[0]::regconfig;
-    interner := TG_ARGV[1]::regclass;
-    column_name := TG_ARGV[2]::name;
-
-    EXECUTE format('SELECT ($1).%I, ($2).%I', column_name, column_name)
-    INTO old_column_value, new_column_value
-    USING OLD, NEW;
-
-    IF new_column_value IS NOT NULL AND new_column_value IS DISTINCT FROM old_column_value THEN
-        EXECUTE format(
-            'INSERT INTO %s (token)
-            SELECT t.lexeme
-            FROM unnest(to_tsvector($1, $2)) AS t(lexeme, positions, weights)
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM %s AS interner
-                WHERE interner.token = t.lexeme
-            )
-            ON CONFLICT (token) DO NOTHING',
-            interner,
-            interner
-        )
-        USING config, new_column_value;
-    END IF;
-
-    RETURN NEW;
-END;
-$$;
-
-CREATE PROCEDURE create_interner(
-    interner_name text,
-    config regconfig,
-    relation regclass,
-    column_name name,
-    trigger regproc
-)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    EXECUTE format('CREATE TABLE %I (id serial PRIMARY KEY, token text)', interner_name);
-
-    EXECUTE format(
-        'INSERT INTO %I (token)
-        SELECT DISTINCT t.lexeme
-        FROM %s AS r, unnest(to_tsvector($1, r.%I)) AS t(lexeme, positions, weights)',
-        interner_name,
-        relation,
-        column_name
+CREATE FUNCTION intern(config regconfig, document text)
+RETURNS int[]
+IMMUTABLE STRICT PARALLEL SAFE
+LANGUAGE sql
+AS $function$
+    WITH vector AS (
+        SELECT
+            hashtext(t.lexeme) AS id,
+            cardinality(t.positions) AS freq
+        FROM unnest(to_tsvector(config, document)) AS t(lexeme, positions, weights)
+    ),
+    ids AS (
+        SELECT id
+        FROM vector, generate_series(1, freq)
+        WHERE id IS NOT NULL
     )
-    USING config;
-
-    EXECUTE format('ALTER TABLE %I ADD UNIQUE (token)', interner_name);
-    EXECUTE format('CREATE INDEX %I ON %I USING hash (token)', interner_name || '_token_hash_idx', interner_name);
-
-    IF trigger IS NOT NULL THEN
-        EXECUTE format(
-            'CREATE TRIGGER %I
-            BEFORE INSERT ON %s
-            FOR EACH ROW
-            EXECUTE FUNCTION %s(%L, %L, %L)',
-            interner_name || '_interner_insert_trigger',
-            relation,
-            trigger,
-            config::text,
-            interner_name,
-            column_name
-        );
-
-        EXECUTE format(
-            'CREATE TRIGGER %I
-            BEFORE UPDATE OF %I ON %s
-            FOR EACH ROW
-            EXECUTE FUNCTION %s(%L, %L, %L)',
-            interner_name || '_interner_update_trigger',
-            column_name,
-            relation,
-            trigger,
-            config::text,
-            interner_name,
-            column_name
-        );
-    END IF;
-
-    EXECUTE format(
-        'CREATE FUNCTION %I(input text)
-        RETURNS int[]
-        STABLE STRICT PARALLEL SAFE
-        LANGUAGE sql
-        AS $function$
-            WITH vector AS (
-                SELECT
-                    (SELECT interner.id FROM %I AS interner WHERE interner.token = t.lexeme) AS id,
-                    cardinality(t.positions) AS freq
-                FROM unnest(to_tsvector(%L, input)) AS t(lexeme, positions, weights)
-            ),
-            ids AS (
-                SELECT id
-                FROM vector, generate_series(1, freq)
-                WHERE id IS NOT NULL
-            )
-            SELECT coalesce(array_agg(id), ARRAY[]::int[])
-            FROM ids
-        $function$',
-        interner_name,
-        interner_name,
-        config::text
-    );
-END;
-$$;
+    SELECT coalesce(array_agg(id), ARRAY[]::int[])
+    FROM ids
+$function$;
 
 -- Clean up existing tables
 DROP TABLE IF EXISTS msmarco_passages CASCADE;
@@ -152,8 +51,7 @@ DROP TABLE IF EXISTS msmarco_qrels CASCADE;
 \echo 'Creating passages table...'
 CREATE TABLE msmarco_passages (
     passage_id INTEGER PRIMARY KEY,
-    passage_text TEXT NOT NULL,
-    embedding bm25vector
+    passage_text TEXT NOT NULL
 );
 
 -- Create queries table
@@ -222,20 +120,8 @@ LIMIT 5;
 \echo '=== Building BM25 Index ==='
 \echo 'Creating BM25 index on ~8.8M passages (this will take a while)...'
 
-CALL create_interner('intern', 'english', 'msmarco_passages', 'passage_text', null);
-
-CREATE TABLE msmarco_passages_temp AS
-SELECT passage_id, passage_text, intern(passage_text)::bm25vector AS embedding
-FROM msmarco_passages;
-
-ALTER TABLE msmarco_passages_temp ADD PRIMARY KEY (passage_id);
-
-DROP TABLE msmarco_passages;
-
-ALTER TABLE msmarco_passages_temp RENAME TO msmarco_passages;
-
 CREATE INDEX msmarco_bm25_idx ON msmarco_passages
-    USING bm25 (embedding bm25_ops);
+    USING bm25 ((intern('english', passage_text)::bm25vector) bm25_ops);
 
 -- Report index and table sizes
 \echo ''
