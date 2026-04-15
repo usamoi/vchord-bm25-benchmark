@@ -16,6 +16,118 @@
 \echo 'Loading ~8.8M passages from MS MARCO collection'
 \echo ''
 
+-- Clean up existing functions
+
+DROP TABLE IF EXISTS update_lexicon CASCADE;
+DROP TABLE IF EXISTS create_lexicon CASCADE;
+
+-- Create functions
+
+CREATE FUNCTION update_lexicon() RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    config regconfig;
+    lexicon regclass;
+    column_name name;
+    old_column_value text;
+    new_column_value text;
+BEGIN
+    config := TG_ARGV[0]::regconfig;
+    lexicon := TG_ARGV[1]::regclass;
+    column_name := TG_ARGV[2]::name;
+
+    EXECUTE format('SELECT ($1).%I, ($2).%I', column_name, column_name)
+    INTO old_column_value, new_column_value
+    USING OLD, NEW;
+
+    IF new_column_value IS NOT NULL AND new_column_value IS DISTINCT FROM old_column_value THEN
+        EXECUTE format(
+            'INSERT INTO %s (token)
+            SELECT unnest(tsvector_to_array(to_tsvector($1, $2)))
+            ON CONFLICT (token) DO NOTHING',
+            lexicon
+        )
+        USING config, new_column_value;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE PROCEDURE create_lexicon(
+    lexicon_name text,
+    config regconfig,
+    relation regclass,
+    column_name name,
+    trigger regproc
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    EXECUTE format('CREATE TABLE %I (id serial PRIMARY KEY, token text)', lexicon_name);
+
+    EXECUTE format(
+        'INSERT INTO %I (token)
+        SELECT DISTINCT unnest(tsvector_to_array(to_tsvector($1, r.%I)))
+        FROM %s AS r',
+        lexicon_name,
+        column_name,
+        relation
+    )
+    USING config;
+
+    EXECUTE format('ALTER TABLE %I ADD UNIQUE (token)', lexicon_name);
+    EXECUTE format('CREATE INDEX %I ON %I USING hash (token)', lexicon_name || '_token_hash_idx', lexicon_name);
+
+    IF trigger IS NOT NULL THEN
+        EXECUTE format(
+            'CREATE TRIGGER %I
+            BEFORE INSERT ON %s
+            FOR EACH ROW
+            EXECUTE FUNCTION %s(%L, %L, %L)',
+            lexicon_name || '_lexicon_insert_trigger',
+            relation,
+            trigger,
+            config::text,
+            lexicon_name,
+            column_name
+        );
+
+        EXECUTE format(
+            'CREATE TRIGGER %I
+            BEFORE UPDATE OF %I ON %s
+            FOR EACH ROW
+            EXECUTE FUNCTION %s(%L, %L, %L)',
+            lexicon_name || '_lexicon_update_trigger',
+            column_name,
+            relation,
+            trigger,
+            config::text,
+            lexicon_name,
+            column_name
+        );
+    END IF;
+
+    EXECUTE format(
+        'CREATE FUNCTION %I(input text)
+        RETURNS int[]
+        STABLE STRICT PARALLEL SAFE
+        LANGUAGE sql
+        AS $function$
+            WITH ids AS (
+                SELECT (SELECT lexicon.id FROM %I AS lexicon WHERE lexicon.token = t.lexeme) AS id
+                FROM unnest(to_tsvector(%L, input)) t(lexeme, positions, weights), unnest(t.positions)
+            )
+            SELECT COALESCE(array_agg(id) FILTER (WHERE id IS NOT NULL), ARRAY[]::int[])
+            FROM ids
+        $function$',
+        lexicon_name,
+        lexicon_name,
+        config::text
+    );
+END;
+$$;
 
 -- Clean up existing tables
 DROP TABLE IF EXISTS msmarco_passages CASCADE;
@@ -95,31 +207,11 @@ LIMIT 5;
 \echo ''
 \echo '=== Building BM25 Index ==='
 \echo 'Creating BM25 index on ~8.8M passages (this will take a while)...'
-SELECT tokenizer_catalog.create_text_analyzer('text_analyzer1', $$
-pre_tokenizer = "unicode_segmentation"
-[[character_filters]]
-to_lowercase = {}
-[[character_filters]]
-unicode_normalization = "nfkd"
-[[token_filters]]
-skip_non_alphanumeric = {}
-[[token_filters]]
-stopwords = "nltk_english"
-[[token_filters]]
-stemmer = "english_porter2"
-$$);
 
-SELECT tokenizer_catalog.create_custom_model('model1', $$
-table = 'msmarco_passages'
-column = 'passage_text'
-text_analyzer = 'text_analyzer1'
-$$);
+CALL create_lexicon('intern', 'english', 'msmarco_passages', 'passage_text', 'update_lexicon');
 
-SELECT create_tokenizer('bert', $$
-text_analyzer = 'text_analyzer1'
-model = 'model1'
-$$);
-UPDATE msmarco_passages SET embedding = tokenize(passage_text, 'bert');
+UPDATE msmarco_passages SET embedding = intern(passage_text);
+
 CREATE INDEX msmarco_bm25_idx ON msmarco_passages
     USING bm25 (embedding bm25_ops);
 

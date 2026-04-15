@@ -7,7 +7,6 @@ permissions:
 env:
   PG_SEARCH_VERSION: "0.20.6"
   PG_TEXTSEARCH_VERSION: "0.4.0"
-  PG_TOKENIZER_VERSION: "0.1.1"
 
 on:
   # Manual trigger
@@ -563,10 +562,6 @@ jobs:
         make build
         sudo make install
 
-        # Install pg_tokenizer from GitHub releases
-        wget -q "https://github.com/tensorchord/pg_tokenizer.rs/releases/download/${PG_TOKENIZER_VERSION}/postgresql-17-pg-tokenizer_${PG_TOKENIZER_VERSION}-1_amd64.deb"
-        sudo dpkg -i "postgresql-17-pg-tokenizer_${PG_TOKENIZER_VERSION}-1_amd64.deb"
-
     - name: Configure PostgreSQL for benchmarks
       run: |
         export PATH="/usr/lib/postgresql/17/bin:$PATH"
@@ -589,8 +584,7 @@ jobs:
         max_parallel_maintenance_workers = $NCPUS
         max_parallel_workers_per_gather = $NCPUS
         max_parallel_workers = $NCPUS
-        shared_preload_libraries = 'pg_tokenizer, vchord_bm25'
-        search_path = 'public, pg_catalog, tokenizer_catalog'
+        shared_preload_libraries = 'vchord_bm25'
         bm25.limit = 10
         EOF
 
@@ -607,7 +601,6 @@ jobs:
         fi
         export PGHOST="$PWD/tmp_bench/socket"
         createdb bench_test
-        psql -d bench_test -c "CREATE EXTENSION pg_tokenizer CASCADE"
         psql -d bench_test -c "CREATE EXTENSION vchord_bm25 CASCADE"
         echo "PGHOST=$PWD/tmp_bench/socket" >> $GITHUB_ENV
 
