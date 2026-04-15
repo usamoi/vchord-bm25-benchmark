@@ -18,23 +18,23 @@
 
 -- Clean up existing functions
 
-DROP TABLE IF EXISTS update_lexicon CASCADE;
-DROP TABLE IF EXISTS create_lexicon CASCADE;
+DROP TABLE IF EXISTS update_interner CASCADE;
+DROP TABLE IF EXISTS create_interner CASCADE;
 
 -- Create functions
 
-CREATE FUNCTION update_lexicon() RETURNS trigger
+CREATE FUNCTION update_interner() RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 DECLARE
     config regconfig;
-    lexicon regclass;
+    interner regclass;
     column_name name;
     old_column_value text;
     new_column_value text;
 BEGIN
     config := TG_ARGV[0]::regconfig;
-    lexicon := TG_ARGV[1]::regclass;
+    interner := TG_ARGV[1]::regclass;
     column_name := TG_ARGV[2]::name;
 
     EXECUTE format('SELECT ($1).%I, ($2).%I', column_name, column_name)
@@ -44,9 +44,16 @@ BEGIN
     IF new_column_value IS NOT NULL AND new_column_value IS DISTINCT FROM old_column_value THEN
         EXECUTE format(
             'INSERT INTO %s (token)
-            SELECT unnest(tsvector_to_array(to_tsvector($1, $2)))
+            SELECT t.lexeme
+            FROM unnest(to_tsvector($1, $2)) AS t(lexeme, positions, weights)
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM %s AS interner
+                WHERE interner.token = t.lexeme
+            )
             ON CONFLICT (token) DO NOTHING',
-            lexicon
+            interner,
+            interner
         )
         USING config, new_column_value;
     END IF;
@@ -55,8 +62,8 @@ BEGIN
 END;
 $$;
 
-CREATE PROCEDURE create_lexicon(
-    lexicon_name text,
+CREATE PROCEDURE create_interner(
+    interner_name text,
     config regconfig,
     relation regclass,
     column_name name,
@@ -65,20 +72,20 @@ CREATE PROCEDURE create_lexicon(
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    EXECUTE format('CREATE TABLE %I (id serial PRIMARY KEY, token text)', lexicon_name);
+    EXECUTE format('CREATE TABLE %I (id serial PRIMARY KEY, token text)', interner_name);
 
     EXECUTE format(
         'INSERT INTO %I (token)
-        SELECT DISTINCT unnest(tsvector_to_array(to_tsvector($1, r.%I)))
-        FROM %s AS r',
-        lexicon_name,
-        column_name,
-        relation
+        SELECT DISTINCT t.lexeme
+        FROM %s AS r, unnest(to_tsvector($1, r.%I)) AS t(lexeme, positions, weights)',
+        interner_name,
+        relation,
+        column_name
     )
     USING config;
 
-    EXECUTE format('ALTER TABLE %I ADD UNIQUE (token)', lexicon_name);
-    EXECUTE format('CREATE INDEX %I ON %I USING hash (token)', lexicon_name || '_token_hash_idx', lexicon_name);
+    EXECUTE format('ALTER TABLE %I ADD UNIQUE (token)', interner_name);
+    EXECUTE format('CREATE INDEX %I ON %I USING hash (token)', interner_name || '_token_hash_idx', interner_name);
 
     IF trigger IS NOT NULL THEN
         EXECUTE format(
@@ -86,11 +93,11 @@ BEGIN
             BEFORE INSERT ON %s
             FOR EACH ROW
             EXECUTE FUNCTION %s(%L, %L, %L)',
-            lexicon_name || '_lexicon_insert_trigger',
+            interner_name || '_interner_insert_trigger',
             relation,
             trigger,
             config::text,
-            lexicon_name,
+            interner_name,
             column_name
         );
 
@@ -99,12 +106,12 @@ BEGIN
             BEFORE UPDATE OF %I ON %s
             FOR EACH ROW
             EXECUTE FUNCTION %s(%L, %L, %L)',
-            lexicon_name || '_lexicon_update_trigger',
+            interner_name || '_interner_update_trigger',
             column_name,
             relation,
             trigger,
             config::text,
-            lexicon_name,
+            interner_name,
             column_name
         );
     END IF;
@@ -115,15 +122,22 @@ BEGIN
         STABLE STRICT PARALLEL SAFE
         LANGUAGE sql
         AS $function$
-            WITH ids AS (
-                SELECT (SELECT lexicon.id FROM %I AS lexicon WHERE lexicon.token = t.lexeme) AS id
-                FROM unnest(to_tsvector(%L, input)) t(lexeme, positions, weights), unnest(t.positions)
+            WITH vector AS (
+                SELECT
+                    (SELECT interner.id FROM %I AS interner WHERE interner.token = t.lexeme) AS id,
+                    cardinality(t.positions) AS freq
+                FROM unnest(to_tsvector(%L, input)) AS t(lexeme, positions, weights)
+            ),
+            ids AS (
+                SELECT id
+                FROM vector, generate_series(1, freq)
+                WHERE id IS NOT NULL
             )
-            SELECT COALESCE(array_agg(id) FILTER (WHERE id IS NOT NULL), ARRAY[]::int[])
+            SELECT coalesce(array_agg(id), ARRAY[]::int[])
             FROM ids
         $function$',
-        lexicon_name,
-        lexicon_name,
+        interner_name,
+        interner_name,
         config::text
     );
 END;
@@ -208,9 +222,17 @@ LIMIT 5;
 \echo '=== Building BM25 Index ==='
 \echo 'Creating BM25 index on ~8.8M passages (this will take a while)...'
 
-CALL create_lexicon('intern', 'english', 'msmarco_passages', 'passage_text', 'update_lexicon');
+CALL create_interner('intern', 'english', 'msmarco_passages', 'passage_text', null);
 
-UPDATE msmarco_passages SET embedding = intern(passage_text);
+CREATE TABLE msmarco_passages_temp AS
+SELECT passage_id, passage_text, intern(passage_text)::bm25vector AS embedding
+FROM msmarco_passages;
+
+ALTER TABLE msmarco_passages_temp ADD PRIMARY KEY (passage_id);
+
+DROP TABLE msmarco_passages;
+
+ALTER TABLE msmarco_passages_temp RENAME TO msmarco_passages;
 
 CREATE INDEX msmarco_bm25_idx ON msmarco_passages
     USING bm25 (embedding bm25_ops);
