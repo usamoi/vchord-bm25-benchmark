@@ -6,7 +6,7 @@ permissions:
 
 env:
   PG_SEARCH_VERSION: "0.20.6"
-  PG_TEXTSEARCH_VERSION: "0.4.0"
+  PG_TEXTSEARCH_VERSION: "1.0.0"
 
 on:
   # Manual trigger
@@ -30,7 +30,7 @@ on:
       compress_segments:
         description: 'Enable segment compression (delta + bitpacking)'
         required: false
-        default: false
+        default: true
         type: boolean
 
 jobs:
@@ -86,7 +86,6 @@ jobs:
         checkpoint_completion_target = 0.9
         wal_buffers = 64MB
         random_page_cost = 1.1
-        effective_io_concurrency = 200
         max_parallel_maintenance_workers = $NCPUS
         max_parallel_workers_per_gather = $NCPUS
         max_parallel_workers = $NCPUS
@@ -256,10 +255,10 @@ jobs:
         checkpoint_completion_target = 0.9
         wal_buffers = 64MB
         random_page_cost = 1.1
-        effective_io_concurrency = 200
         max_parallel_maintenance_workers = $NCPUS
         max_parallel_workers_per_gather = $NCPUS
         max_parallel_workers = $NCPUS
+        shared_preload_libraries = 'pg_textsearch'
         pg_textsearch.index_memory_limit = 512MB
         pg_textsearch.segments_per_level = 16
         EOF
@@ -588,12 +587,6 @@ jobs:
         bm25.limit = 10
         EOF
 
-        # Enable compression if requested
-        if [ "${{ github.event.inputs.compress_segments }}" = "true" ]; then
-          echo "pg_textsearch.compress_segments = on" >> tmp_bench/data/postgresql.conf
-          echo "Compression enabled for this benchmark run"
-        fi
-
         if ! pg_ctl start -D tmp_bench/data -l tmp_bench/postgres.log -w; then
           echo "PostgreSQL failed to start. Log:"
           cat tmp_bench/postgres.log
@@ -642,7 +635,6 @@ jobs:
         echo "**Date:** $(date -u)" >> benchmark_summary.md
         echo "**Commit:** ${{ github.sha }}" >> benchmark_summary.md
         echo "**Dataset:** ${{ steps.datasets.outputs.dataset }}" >> benchmark_summary.md
-        echo "**Compression:** ${{ github.event.inputs.compress_segments == 'true' && 'enabled' || 'disabled' }}" >> benchmark_summary.md
         echo "" >> benchmark_summary.md
 
         chmod +x benchmarks/runner/extract_metrics.sh
@@ -702,10 +694,6 @@ jobs:
         if [ -f benchmark_metrics.json ]; then
           echo "### vectorchord-bm25 Benchmark Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event.inputs.compress_segments }}" = "true" ]; then
-            echo "**Compression: enabled**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Documents | $(jq -r '.metrics.num_documents // "N/A"' benchmark_metrics.json) |" >> $GITHUB_STEP_SUMMARY
