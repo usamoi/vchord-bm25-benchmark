@@ -121,7 +121,7 @@ LIMIT 5;
 \echo 'Creating BM25 index on ~8.8M passages (this will take a while)...'
 
 CREATE INDEX msmarco_bm25_idx ON msmarco_passages
-    USING bm25 ((intern('english', passage_text)::bm25vector) bm25_ops);
+    USING bm25 ((to_tsvector('english', passage_text)) bm25_ops);
 
 -- Report index and table sizes
 \echo ''

@@ -556,8 +556,10 @@ jobs:
         sudo apt-get install -y postgresql-17 postgresql-server-dev-17
 
         # Install vectorchord-bm25
-        git clone https://github.com/tensorchord/VectorChord-bm25.git
+        rustup update
+        git clone https://github.com/usamoi/VectorChord-bm25.git
         cd VectorChord-bm25
+        git checkout intern
         make build
         sudo make install
 
