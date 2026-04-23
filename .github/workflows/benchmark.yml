@@ -557,9 +557,9 @@ jobs:
 
         # Install vectorchord-bm25
         rustup update
-        git clone https://github.com/tensorchord/VectorChord-bm25.git
+        git clone https://github.com/usamoi/VectorChord-bm25.git
         cd VectorChord-bm25
-        git checkout main
+        git checkout external_sort
         make build
         sudo make install
 
